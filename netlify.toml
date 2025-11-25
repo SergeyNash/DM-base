@@ -1,0 +1,11 @@
+[build]
+  command = "npm run build:frontend"
+  publish = "frontend/dist"
+  functions = "netlify/functions"
+
+[dev]
+  framework = "vite"
+  command = "npm run dev:frontend"
+  targetPort = 5173
+  port = 8888
+

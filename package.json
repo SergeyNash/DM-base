@@ -1,0 +1,37 @@
+{
+  "name": "dm-base",
+  "version": "1.0.0",
+  "description": "Application security defect managment platform",
+  "main": "index.js",
+  "scripts": {
+    "dev": "netlify dev",
+    "build": "npm run build:frontend",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "dev:frontend": "npm run dev --prefix frontend",
+    "build:frontend": "npm run build --prefix frontend",
+    "preview:frontend": "npm run preview --prefix frontend"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/SergeyNash/DM-base.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/SergeyNash/DM-base/issues"
+  },
+  "homepage": "https://github.com/SergeyNash/DM-base#readme",
+  "dependencies": {
+    "zod": "^4.1.13"
+  },
+  "devDependencies": {
+    "@netlify/functions": "^5.1.0",
+    "@types/node": "^24.10.1",
+    "netlify-cli": "^23.11.1",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.9.3",
+    "vitest": "^4.0.14"
+  }
+}
