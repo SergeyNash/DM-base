@@ -3,6 +3,7 @@
   "version": "1.0.0",
   "description": "Application security defect managment platform",
   "main": "index.js",
+  "workspaces": ["frontend"],
   "scripts": {
     "dev": "netlify dev",
     "build": "npm run build:frontend",
