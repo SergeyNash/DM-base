@@ -158,8 +158,8 @@ h2 {
 
 .panel--content {
   display: grid;
-  grid-template-columns: 0.55fr 0.45fr;
-  gap: 1.5rem;
+  grid-template-columns: minmax(0, 1fr) 320px;
+  gap: 1.25rem;
 }
 
 .filter-group {
@@ -307,14 +307,14 @@ input[type="number"] {
 .table-scroll {
   border: 1px solid #e2e8f0;
   border-radius: 18px;
-  overflow: auto;
+  overflow: hidden;
 }
 
 .appsec-table {
   width: 100%;
   border-collapse: separate;
   border-spacing: 0;
-  min-width: 1100px;
+  table-layout: fixed;
 }
 
 .appsec-table th {
@@ -331,10 +331,15 @@ input[type="number"] {
 }
 
 .appsec-table td {
-  padding: 0.75rem;
+  padding: 0.65rem;
   border-bottom: 1px solid #f1f5f9;
-  font-size: 0.9rem;
+  font-size: 0.85rem;
   vertical-align: top;
+  word-break: break-word;
+}
+
+.appsec-table th {
+  word-break: break-word;
 }
 
 .appsec-table tr.is-active {

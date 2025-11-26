@@ -22,7 +22,6 @@ interface FiltersState {
   search: string;
   priority: PriorityLevel[];
   status: StatusValue[];
-  minAgeDays: number;
   groupBy: GroupingMode;
 }
 
@@ -36,7 +35,6 @@ const initialFilters: FiltersState = {
   search: "",
   priority: defaultPriorityFilter,
   status: defaultStatusFilter,
-  minAgeDays: 7,
   groupBy: "vulnType",
 };
 
@@ -221,8 +219,6 @@ export default function App() {
         const statusOk =
           filters.status.length === 0 ||
           filters.status.includes(entry.status);
-        const ageOk =
-          filters.minAgeDays <= 0 || entry.ageDays >= filters.minAgeDays;
         const searchOk =
           !search ||
           [
@@ -237,9 +233,7 @@ export default function App() {
           ]
             .filter(Boolean)
             .some((value) => value!.toLowerCase().includes(search));
-        return (
-          severityOk && toolOk && reportOk && priorityOk && statusOk && ageOk && searchOk
-        );
+        return severityOk && toolOk && reportOk && priorityOk && statusOk && searchOk;
       })
       .sort((a, b) => {
         if (a.priority !== b.priority) {
@@ -704,20 +698,6 @@ export default function App() {
                   ))}
                 </div>
               </div>
-              <label>
-                Мин. возраст (дней)
-                <input
-                  type="number"
-                  min={0}
-                  value={filters.minAgeDays}
-                  onChange={(event) =>
-                    setFilters((prev) => ({
-                      ...prev,
-                      minAgeDays: Math.max(0, Number(event.target.value) || 0),
-                    }))
-                  }
-                />
-              </label>
               <button
                 className="action-button"
                 type="button"
