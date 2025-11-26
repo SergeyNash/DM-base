@@ -1,10 +1,12 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
-import { uploadSarifFile } from "./api";
+import { fetchReports, uploadSarifFile } from "./api";
+import { getOrCreateSessionId } from "./session";
 import type {
   NormalizedFinding,
   NormalizedSarif,
   NormalizedSeverity,
+  SarifReport,
 } from "./types/sarif";
 
 type SeverityFilter = NormalizedSeverity | "all";
@@ -21,13 +23,71 @@ const initialFilters: FiltersState = {
   search: "",
 };
 
+const MAX_REPORTS = 10;
+
 export default function App() {
+  const [sessionId] = useState(() => getOrCreateSessionId());
+  const [reports, setReports] = useState<SarifReport[]>([]);
+  const [activeReportId, setActiveReportId] = useState<string | null>(null);
   const [report, setReport] = useState<NormalizedSarif | null>(null);
   const [filters, setFilters] = useState<FiltersState>(initialFilters);
   const [selectedFinding, setSelectedFinding] =
     useState<NormalizedFinding | null>(null);
   const [isUploading, setIsUploading] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let mounted = true;
+    if (!sessionId) {
+      setIsLoading(false);
+      return;
+    }
+    fetchReports(sessionId)
+      .then((data) => {
+        if (!mounted) return;
+        setReports(data);
+        const latest = data[0] ?? null;
+        setActiveReportId(latest?.id ?? null);
+        setReport(latest?.normalized ?? null);
+        setSelectedFinding(latest?.normalized.findings[0] ?? null);
+      })
+      .catch((err) => {
+        if (!mounted) return;
+        setError(
+          err instanceof Error
+            ? err.message
+            : "Не удалось загрузить сохранённые отчёты"
+        );
+      })
+      .finally(() => {
+        if (mounted) {
+          setIsLoading(false);
+        }
+      });
+    return () => {
+      mounted = false;
+    };
+  }, [sessionId]);
+
+  useEffect(() => {
+    if (!activeReportId) {
+      setReport(null);
+      setSelectedFinding(null);
+      return;
+    }
+    const current = reports.find((item) => item.id === activeReportId);
+    if (current) {
+      setReport(current.normalized);
+      setSelectedFinding(current.normalized.findings[0] ?? null);
+      setFilters(initialFilters);
+    }
+  }, [activeReportId, reports]);
+
+  const selectedReport = useMemo(
+    () => reports.find((item) => item.id === activeReportId) ?? null,
+    [activeReportId, reports]
+  );
 
   const filteredFindings = useMemo(() => {
     if (!report) {
@@ -69,25 +129,31 @@ export default function App() {
   const handleFileChange = async (
     event: React.ChangeEvent<HTMLInputElement>
   ) => {
-    const file = event.target.files?.[0];
-    if (!file) {
+    const files = Array.from(event.target.files ?? []);
+    event.target.value = "";
+    if (files.length === 0) {
       return;
     }
-    await processFile(file);
-    event.target.value = "";
+    if (reports.length + files.length > MAX_REPORTS) {
+      setError(
+        `Можно хранить не более ${MAX_REPORTS} отчетов. Удалите старые или выберите меньше файлов.`
+      );
+      return;
+    }
+
+    for (const file of files) {
+      await processFile(file);
+    }
   };
 
   const processFile = async (file: File) => {
     setIsUploading(true);
     setError(null);
     try {
-      const normalized = await uploadSarifFile(file);
-      setReport(normalized);
-      setSelectedFinding(normalized.findings[0] ?? null);
-      setFilters(initialFilters);
+      const saved = await uploadSarifFile(file, sessionId);
+      setReports((prev) => [saved, ...prev]);
+      setActiveReportId(saved.id);
     } catch (err) {
-      setReport(null);
-      setSelectedFinding(null);
       setError(err instanceof Error ? err.message : "Неизвестная ошибка");
     } finally {
       setIsUploading(false);
@@ -109,21 +175,58 @@ export default function App() {
             находок с фильтрами.
           </p>
         </div>
-        <label className="file-input">
+        <div className="upload-controls">
+          <label className="file-input">
           <input
             type="file"
             accept=".sarif,application/json"
+            multiple
             onChange={handleFileChange}
             disabled={isUploading}
           />
           {isUploading ? "Загрузка..." : "Выбрать SARIF"}
-        </label>
+          </label>
+          <p className="upload-hint">
+            Доступно слотов: {Math.max(0, MAX_REPORTS - reports.length)} /{" "}
+            {MAX_REPORTS}
+          </p>
+        </div>
       </header>
 
       {error && <div className="banner banner--error">{error}</div>}
 
       {report ? (
         <main className="layout">
+          <section className="panel panel--reports">
+            <div className="reports-header">
+              <div>
+                <p className="eyebrow">Загруженные отчёты ({reports.length})</p>
+                <h2>
+                  {selectedReport?.fileName ?? "—"}
+                  {selectedReport?.createdAt && (
+                    <span className="muted small">
+                      {" "}
+                      ·{" "}
+                      {new Date(selectedReport.createdAt).toLocaleString("ru-RU")}
+                    </span>
+                  )}
+                </h2>
+              </div>
+              <div className="pill-group wrap">
+                {reports.map((item) => (
+                  <button
+                    key={item.id}
+                    className={`pill pill--outline ${
+                      item.id === activeReportId ? "is-active" : ""
+                    }`}
+                    onClick={() => setActiveReportId(item.id)}
+                  >
+                    {item.fileName}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </section>
           <section className="panel panel--summary">
             <div>
               <p className="eyebrow">
@@ -249,6 +352,10 @@ export default function App() {
             </aside>
           </section>
         </main>
+      ) : isLoading ? (
+        <div className="placeholder">
+          <p>Загружаем отчёты...</p>
+        </div>
       ) : (
         <div className="placeholder">
           <h2>Нет данных</h2>

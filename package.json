@@ -3,7 +3,9 @@
   "version": "1.0.0",
   "description": "Application security defect managment platform",
   "main": "index.js",
-  "workspaces": ["frontend"],
+  "workspaces": [
+    "frontend"
+  ],
   "scripts": {
     "dev": "netlify dev",
     "build": "npm run build:frontend",
@@ -25,6 +27,7 @@
   },
   "homepage": "https://github.com/SergeyNash/DM-base#readme",
   "dependencies": {
+    "@supabase/supabase-js": "^2.84.0",
     "zod": "^4.1.13"
   },
   "devDependencies": {

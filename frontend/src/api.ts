@@ -1,9 +1,12 @@
-import type { NormalizedSarif } from "./types/sarif";
+import type { NormalizedSarif, SarifReport } from "./types/sarif";
 
 const FUNCTIONS_BASE =
   import.meta.env.VITE_FUNCTIONS_BASE ?? "/.netlify/functions";
 
-export async function uploadSarifFile(file: File): Promise<NormalizedSarif> {
+export async function uploadSarifFile(
+  file: File,
+  sessionId: string
+): Promise<SarifReport> {
   const sarifText = await file.text();
   const response = await fetch(`${FUNCTIONS_BASE}/parse-sarif`, {
     method: "POST",
@@ -13,6 +16,7 @@ export async function uploadSarifFile(file: File): Promise<NormalizedSarif> {
     body: JSON.stringify({
       sarif: sarifText,
       fileName: file.name,
+      sessionId,
     }),
   });
 
@@ -29,7 +33,48 @@ export async function uploadSarifFile(file: File): Promise<NormalizedSarif> {
     throw new Error(errorMessage);
   }
 
-  return (await response.json()) as NormalizedSarif;
+  const payload = await response.json();
+  return mapReport(payload);
+}
+
+export async function fetchReports(
+  sessionId: string
+): Promise<SarifReport[]> {
+  const params = new URLSearchParams({ sessionId });
+  const response = await fetch(
+    `${FUNCTIONS_BASE}/parse-sarif?${params.toString()}`,
+    { method: "GET" }
+  );
+
+  if (!response.ok) {
+    throw new Error("Не удалось получить список отчётов");
+  }
+
+  const payload = (await response.json()) as Array<{
+    id: string;
+    session_id: string;
+    file_name: string;
+    created_at: string;
+    normalized: NormalizedSarif;
+  }>;
+
+  return payload.map(mapReport);
+}
+
+function mapReport(input: {
+  id: string;
+  session_id: string;
+  file_name: string;
+  created_at: string;
+  normalized: NormalizedSarif;
+}): SarifReport {
+  return {
+    id: input.id,
+    sessionId: input.session_id,
+    fileName: input.file_name,
+    createdAt: input.created_at,
+    normalized: input.normalized,
+  };
 }
 
 

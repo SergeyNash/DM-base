@@ -53,5 +53,13 @@ export interface NormalizedSarif {
   findings: NormalizedFinding[];
 }
 
+export interface SarifReport {
+  id: string;
+  sessionId: string;
+  fileName: string;
+  createdAt: string;
+  normalized: NormalizedSarif;
+}
+
 
 
