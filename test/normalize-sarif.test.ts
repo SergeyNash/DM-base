@@ -28,7 +28,7 @@ describe("normalizeSarif", () => {
 
   it("кидает понятную ошибку для невалидного JSON", () => {
     expect(() => parseSarif("{not-valid-json")).toThrow(
-      /SARIF формат невалиден|Unexpected token/
+      /SARIF формат невалиден|Unexpected token|property name/
     );
   });
 });

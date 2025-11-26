@@ -1,0 +1,316 @@
+import { useMemo, useState } from "react";
+
+import { uploadSarifFile } from "./api";
+import type {
+  NormalizedFinding,
+  NormalizedSarif,
+  NormalizedSeverity,
+} from "./types/sarif";
+
+type SeverityFilter = NormalizedSeverity | "all";
+
+interface FiltersState {
+  severity: SeverityFilter;
+  tool: string | "all";
+  search: string;
+}
+
+const initialFilters: FiltersState = {
+  severity: "all",
+  tool: "all",
+  search: "",
+};
+
+export default function App() {
+  const [report, setReport] = useState<NormalizedSarif | null>(null);
+  const [filters, setFilters] = useState<FiltersState>(initialFilters);
+  const [selectedFinding, setSelectedFinding] =
+    useState<NormalizedFinding | null>(null);
+  const [isUploading, setIsUploading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const filteredFindings = useMemo(() => {
+    if (!report) {
+      return [];
+    }
+    return report.findings.filter((finding) => {
+      const severityOk =
+        filters.severity === "all" || finding.severity === filters.severity;
+      const toolOk =
+        filters.tool === "all" || finding.tool.name === filters.tool;
+      const search = filters.search.trim().toLowerCase();
+      const searchOk =
+        !search ||
+        [finding.message, finding.ruleId, finding.location?.file]
+          .filter(Boolean)
+          .some((value) => value!.toLowerCase().includes(search));
+      return severityOk && toolOk && searchOk;
+    });
+  }, [filters, report]);
+
+  const severityOptions = useMemo(() => {
+    if (!report) {
+      return ["all"] as SeverityFilter[];
+    }
+    const available = Object.entries(report.stats.bySeverity)
+      .filter(([, count]) => count > 0)
+      .map(([severity]) => severity as NormalizedSeverity);
+    return ["all", ...available];
+  }, [report]);
+
+  const toolOptions = useMemo(() => {
+    if (!report) {
+      return ["all"];
+    }
+    const names = new Set(report.findings.map((finding) => finding.tool.name));
+    return ["all", ...Array.from(names)];
+  }, [report]);
+
+  const handleFileChange = async (
+    event: React.ChangeEvent<HTMLInputElement>
+  ) => {
+    const file = event.target.files?.[0];
+    if (!file) {
+      return;
+    }
+    await processFile(file);
+    event.target.value = "";
+  };
+
+  const processFile = async (file: File) => {
+    setIsUploading(true);
+    setError(null);
+    try {
+      const normalized = await uploadSarifFile(file);
+      setReport(normalized);
+      setSelectedFinding(normalized.findings[0] ?? null);
+      setFilters(initialFilters);
+    } catch (err) {
+      setReport(null);
+      setSelectedFinding(null);
+      setError(err instanceof Error ? err.message : "Неизвестная ошибка");
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
+  const handleFindingSelect = (finding: NormalizedFinding) => {
+    setSelectedFinding(finding);
+  };
+
+  return (
+    <div className="app">
+      <header className="app__header">
+        <div>
+          <p className="eyebrow">AppSec workspace</p>
+          <h1>SARIF Viewer</h1>
+          <p className="subtitle">
+            Загрузите отчет SAST/DAST в формате SARIF и получите удобный список
+            находок с фильтрами.
+          </p>
+        </div>
+        <label className="file-input">
+          <input
+            type="file"
+            accept=".sarif,application/json"
+            onChange={handleFileChange}
+            disabled={isUploading}
+          />
+          {isUploading ? "Загрузка..." : "Выбрать SARIF"}
+        </label>
+      </header>
+
+      {error && <div className="banner banner--error">{error}</div>}
+
+      {report ? (
+        <main className="layout">
+          <section className="panel panel--summary">
+            <div>
+              <p className="eyebrow">
+                {report.metadata.fileName ?? "Неизвестный файл"}
+              </p>
+              <h2>{report.stats.totalFindings} находок</h2>
+              <p className="subtitle">
+                Инструменты: {report.metadata.toolNames.join(", ")}
+              </p>
+            </div>
+            <div className="pill-group">
+              {Object.entries(report.stats.bySeverity)
+                .filter(([, count]) => count > 0)
+                .map(([severity, count]) => (
+                  <span key={severity} className={`pill pill--${severity}`}>
+                    {severity}: {count}
+                  </span>
+                ))}
+            </div>
+          </section>
+
+          <section className="panel panel--filters">
+            <div className="filter-group">
+              <label>
+                Severity
+                <select
+                  value={filters.severity}
+                  onChange={(event) =>
+                    setFilters((prev) => ({
+                      ...prev,
+                      severity: event.target.value as SeverityFilter,
+                    }))
+                  }
+                >
+                  {severityOptions.map((option) => (
+                    <option key={option} value={option}>
+                      {option}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label>
+                Tool
+                <select
+                  value={filters.tool}
+                  onChange={(event) =>
+                    setFilters((prev) => ({
+                      ...prev,
+                      tool: event.target.value,
+                    }))
+                  }
+                >
+                  {toolOptions.map((option) => (
+                    <option key={option} value={option}>
+                      {option}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="search-field">
+                Поиск
+                <input
+                  type="search"
+                  placeholder="rule/file/message"
+                  value={filters.search}
+                  onChange={(event) =>
+                    setFilters((prev) => ({
+                      ...prev,
+                      search: event.target.value,
+                    }))
+                  }
+                />
+              </label>
+            </div>
+          </section>
+
+          <section className="panel panel--content">
+            <div className="list">
+              {filteredFindings.length === 0 ? (
+                <p className="muted">
+                  Нет находок, удовлетворяющих фильтрам.
+                </p>
+              ) : (
+                filteredFindings.map((finding) => (
+                  <button
+                    key={finding.id}
+                    onClick={() => handleFindingSelect(finding)}
+                    className={`list-item ${
+                      selectedFinding?.id === finding.id ? "is-active" : ""
+                    }`}
+                  >
+                    <div className="list-item__header">
+                      <span className={`pill pill--${finding.severity}`}>
+                        {finding.severity}
+                      </span>
+                      <span className="list-item__rule">
+                        {finding.ruleId}
+                        {finding.ruleName ? ` · ${finding.ruleName}` : ""}
+                      </span>
+                    </div>
+                    <p className="list-item__message">{finding.message}</p>
+                    <p className="list-item__meta">
+                      {finding.tool.name}
+                      {finding.location?.file
+                        ? ` · ${finding.location.file}${
+                            finding.location.startLine
+                              ? `:${finding.location.startLine}`
+                              : ""
+                          }`
+                        : ""}
+                    </p>
+                  </button>
+                ))
+              )}
+            </div>
+
+            <aside className="details">
+              {selectedFinding ? (
+                <FindingDetails finding={selectedFinding} />
+              ) : (
+                <p className="muted">Выберите находку слева, чтобы увидеть детали.</p>
+              )}
+            </aside>
+          </section>
+        </main>
+      ) : (
+        <div className="placeholder">
+          <h2>Нет данных</h2>
+          <p>Загрузите SARIF файл, чтобы начать работу.</p>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function FindingDetails({ finding }: { finding: NormalizedFinding }) {
+  return (
+    <div className="details__content">
+      <h3>{finding.ruleId}</h3>
+      {finding.ruleName && <p className="muted">{finding.ruleName}</p>}
+      <p>{finding.message}</p>
+
+      {finding.location?.file && (
+        <div className="details__section">
+          <h4>Локация</h4>
+          <p>
+            {finding.location.file}
+            {finding.location.startLine
+              ? `:${finding.location.startLine}`
+              : ""}
+          </p>
+          {finding.location.snippet && (
+            <pre className="code-snippet">{finding.location.snippet}</pre>
+          )}
+        </div>
+      )}
+
+      {finding.remediation && (
+        <div className="details__section">
+          <h4>Рекомендации</h4>
+          <p>{finding.remediation}</p>
+        </div>
+      )}
+
+      {finding.tags.length > 0 && (
+        <div className="details__section">
+          <h4>Теги</h4>
+          <div className="pill-group">
+            {finding.tags.map((tag) => (
+              <span key={tag} className="pill">
+                {tag}
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {finding.helpUrl && (
+        <div className="details__section">
+          <h4>Документация</h4>
+          <a href={finding.helpUrl} target="_blank" rel="noreferrer">
+            {finding.helpUrl}
+          </a>
+        </div>
+      )}
+    </div>
+  );
+}
+
+

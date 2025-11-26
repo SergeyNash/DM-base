@@ -32,3 +32,4 @@ export async function uploadSarifFile(file: File): Promise<NormalizedSarif> {
   return (await response.json()) as NormalizedSarif;
 }
 
+

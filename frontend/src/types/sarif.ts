@@ -53,3 +53,4 @@ export interface NormalizedSarif {
   findings: NormalizedFinding[];
 }
 
+
