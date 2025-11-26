@@ -191,24 +191,9 @@ h2 {
   gap: 0.75rem;
 }
 
-.panel--content {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) 380px;
-  gap: 1.5rem;
-}
-
-@media (min-width: 1400px) {
-  .panel--content {
-    grid-template-columns: minmax(0, 1fr) 420px;
-    gap: 2rem;
-  }
-}
-
-@media (min-width: 1920px) {
-  .panel--content {
-    grid-template-columns: minmax(0, 1fr) 480px;
-    gap: 2.5rem;
-  }
+.panel--table {
+  display: flex;
+  flex-direction: column;
 }
 
 .filter-group {
@@ -417,6 +402,53 @@ input[type="number"] {
   background: #eef2ff;
 }
 
+.appsec-table tr {
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.appsec-table tr:hover:not(.row-details) {
+  background: #f8fafc;
+}
+
+.appsec-table tr.is-expanded {
+  background: #eef2ff;
+}
+
+.expand-button {
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  font-size: 0.75rem;
+  color: #475569;
+  padding: 0.25rem 0.5rem;
+  border-radius: 4px;
+  transition: background 0.15s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+}
+
+.expand-button:hover {
+  background: #e2e8f0;
+}
+
+.row-details {
+  background: #f8fafc;
+  cursor: default;
+}
+
+.row-details:hover {
+  background: #f8fafc;
+}
+
+.row-details td {
+  padding: 1.5rem;
+  border-top: 2px solid #e2e8f0;
+}
+
 .table-empty {
   margin: 0;
   padding: 1.5rem 0;
@@ -585,15 +617,33 @@ input[type="number"] {
   min-height: 300px;
 }
 
+.details__content {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.details__content h3 {
+  margin: 0 0 0.25rem;
+  font-size: 1.1rem;
+  color: #0f172a;
+}
+
+.details__content h4 {
+  margin: 0 0 0.4rem;
+  font-size: 0.95rem;
+  color: #0f172a;
+  font-weight: 600;
+}
+
 .details__section {
   border-top: 1px solid #e2e8f0;
   padding-top: 0.75rem;
 }
 
-.details__section h4 {
-  margin: 0 0 0.4rem;
-  font-size: 0.95rem;
-  color: #0f172a;
+.details__section:first-child {
+  border-top: none;
+  padding-top: 0;
 }
 
 .code-snippet {
@@ -645,11 +695,6 @@ input[type="number"] {
   .panel {
     padding: 1.25rem;
     border-radius: 16px;
-  }
-
-  .panel--content {
-    grid-template-columns: 1fr;
-    gap: 1rem;
   }
 
   .bulk-actions {
