@@ -14,6 +14,22 @@ type StatusValue = "new" | "confirmed" | "in_progress" | "resolved";
 type GroupingMode = "vulnType" | "ownerTeam" | "source";
 type AttackVector = "network" | "local" | "physical" | "unknown";
 type TrendState = "up" | "flat" | "down";
+type ColumnId =
+  | "priority"
+  | "cvss"
+  | "severity"
+  | "type"
+  | "vector"
+  | "businessComponent"
+  | "ownerTeam"
+  | "occurrences"
+  | "status"
+  | "age"
+  | "source"
+  | "trend"
+  | "slsa"
+  | "riskFactors"
+  | "group";
 
 interface FiltersState {
   severity: SeverityFilter;
@@ -46,6 +62,23 @@ const TEAM_OPTIONS = [
   "Cloud SecOps",
   "Data Platform",
   "AppSec Platform",
+];
+const DEFAULT_VISIBLE_COLUMNS: ColumnId[] = [
+  "priority",
+  "cvss",
+  "severity",
+  "type",
+  "vector",
+  "businessComponent",
+  "ownerTeam",
+  "occurrences",
+  "status",
+  "age",
+  "source",
+  "trend",
+  "slsa",
+  "riskFactors",
+  "group",
 ];
 
 interface FindingView {
@@ -124,6 +157,8 @@ export default function App() {
   const [reports, setReports] = useState<SarifReport[]>([]);
   const [filters, setFilters] = useState<FiltersState>(initialFilters);
   const [selectedRowIds, setSelectedRowIds] = useState<string[]>([]);
+  const [visibleColumns, setVisibleColumns] =
+    useState<ColumnId[]>(DEFAULT_VISIBLE_COLUMNS);
   const [expandedRowIds, setExpandedRowIds] = useState<Set<string>>(new Set());
   const [rowOverrides, setRowOverrides] = useState<Record<string, RowOverride>>(
     {}
@@ -294,6 +329,14 @@ export default function App() {
     () => buildGroupingData(filteredRows, filters.groupBy),
     [filteredRows, filters.groupBy]
   );
+
+  const visibleColumnConfig = useMemo(() => {
+    return COLUMN_CONFIG.filter((column) =>
+      visibleColumns.includes(column.id)
+    );
+  }, [visibleColumns]);
+
+  const totalRenderedColumns = visibleColumnConfig.length + 2;
 
   const selectedRowsData = useMemo(
     () =>
