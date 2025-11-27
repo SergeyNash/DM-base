@@ -67,19 +67,10 @@ const TEAM_OPTIONS = [
 const DEFAULT_VISIBLE_COLUMNS: ColumnId[] = [
   "priority",
   "cvss",
-  "severity",
   "type",
-  "vector",
-  "businessComponent",
-  "ownerTeam",
-  "occurrences",
   "status",
-  "age",
   "source",
-  "trend",
   "slsa",
-  "riskFactors",
-  "group",
 ];
 const COLUMN_CONFIG: ColumnConfig[] = [
   {

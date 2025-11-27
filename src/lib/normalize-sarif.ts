@@ -1,3 +1,4 @@
+import { createHash } from "crypto";
 import { z } from "zod";
 
 const MessageSchema = z
@@ -81,6 +82,7 @@ const ResultSchema = z
     relatedLocations: z.array(LocationSchema).optional(),
     fixes: z.array(FixSchema).optional(),
     fingerprints: z.record(z.string()).optional(),
+    partialFingerprints: z.record(z.string()).optional(),
     properties: z.record(z.any()).optional(),
     id: z.string().optional(),
     guid: z.string().optional(),
@@ -165,8 +167,10 @@ export interface NormalizedFinding {
   remediation?: string;
   helpUrl?: string;
   tags: string[];
+  partialFingerprints: Record<string, string>;
   fingerprints: Record<string, string>;
   properties: Record<string, unknown>;
+  dedupeKey: string;
   rawResult: SarifResult;
 }
 
@@ -256,6 +260,14 @@ export function normalizeSarif(
           ...extractTags(rule?.properties?.tags),
         ])
       );
+      const partialFingerprints = result.partialFingerprints ?? {};
+      const dedupeKey = buildDedupeKey({
+        result,
+        message,
+        location,
+        severity,
+        partialFingerprints,
+      });
 
       findings.push({
         id:
@@ -280,8 +292,10 @@ export function normalizeSarif(
         remediation,
         helpUrl: rule?.helpUri,
         tags,
+        partialFingerprints,
         fingerprints: result.fingerprints ?? {},
         properties: result.properties ?? {},
+        dedupeKey,
         rawResult: result,
       });
     });
@@ -404,5 +418,34 @@ function extractTags(source: unknown): string[] {
     return [source];
   }
   return [];
+}
+
+function buildDedupeKey(input: {
+  result: SarifResult;
+  message: string;
+  location?: NormalizedFindingLocation;
+  severity: NormalizedSeverity;
+  partialFingerprints: Record<string, string>;
+}) {
+  const candidateFingerprints = [
+    input.partialFingerprints?.primaryLocationFingerprint,
+    input.partialFingerprints?.["primaryLocationFingerprint/v2"],
+    input.result.fingerprints?.primaryLocationFingerprint,
+    input.result.fingerprints?.["primaryLocationFingerprint/v2"],
+  ].filter(Boolean);
+
+  const fingerprintPayload = JSON.stringify(candidateFingerprints);
+
+  const parts = [
+    input.result.ruleId ?? "unknown",
+    input.severity,
+    input.message,
+    input.location?.file ?? "",
+    String(input.location?.startLine ?? ""),
+    String(input.location?.startColumn ?? ""),
+    fingerprintPayload,
+  ];
+
+  return createHash("sha256").update(parts.join("::")).digest("hex");
 }
 

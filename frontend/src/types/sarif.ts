@@ -35,8 +35,10 @@ export interface NormalizedFinding {
   remediation?: string;
   helpUrl?: string;
   tags: string[];
+  partialFingerprints: Record<string, string>;
   fingerprints: Record<string, string>;
   properties: Record<string, unknown>;
+  dedupeKey: string;
 }
 
 export interface NormalizedSarif {
