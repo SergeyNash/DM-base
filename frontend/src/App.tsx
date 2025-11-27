@@ -1266,7 +1266,7 @@ function buildAppSecRow(entry: FindingView): AppSecRow {
     businessComponent,
     ownerTeam,
     occurrences: 1,
-    dedupeKey: entry.finding.dedupeKey,
+    dedupeKey: entry.finding.dedupeKey || entry.uid,
     dedupeCount: 1,
     status,
     ageDays,
