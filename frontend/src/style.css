@@ -369,6 +369,14 @@ input[type="number"] {
   margin-top: 0.25rem;
 }
 
+.toggle-inline {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-weight: 600;
+  color: #0f172a;
+}
+
 .bulk-actions {
   display: flex;
   flex-wrap: wrap;

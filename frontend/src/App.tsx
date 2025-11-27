@@ -281,6 +281,7 @@ export default function App() {
   const [visibleColumns, setVisibleColumns] =
     useState<ColumnId[]>(DEFAULT_VISIBLE_COLUMNS);
   const [expandedRowId, setExpandedRowId] = useState<string | null>(null);
+  const [isDedupeEnabled, setIsDedupeEnabled] = useState(true);
   const [rowOverrides, setRowOverrides] = useState<Record<string, RowOverride>>(
     {}
   );
@@ -363,9 +364,21 @@ export default function App() {
     });
   }, [rawAppSecRows, rowOverrides]);
 
+  const dedupedRows = useMemo(() => {
+    const seen = new Set<string>();
+    return resolvedRows.filter((row) => {
+      if (seen.has(row.dedupeKey)) {
+        return false;
+      }
+      seen.add(row.dedupeKey);
+      return true;
+    });
+  }, [resolvedRows]);
+
   const filteredRows = useMemo(() => {
+    const sourceRows = isDedupeEnabled ? dedupedRows : resolvedRows;
     const search = filters.search.trim().toLowerCase();
-    return resolvedRows
+    return sourceRows
       .filter((entry) => {
         const severityOk =
           filters.severity === "all" ||
@@ -405,7 +418,7 @@ export default function App() {
         }
         return b.ageDays - a.ageDays;
       });
-  }, [resolvedRows, filters]);
+  }, [resolvedRows, dedupedRows, filters, isDedupeEnabled]);
 
   useEffect(() => {
     if (!actionMessage) {
@@ -583,6 +596,10 @@ export default function App() {
 
   const resetColumns = () => {
     setVisibleColumns(DEFAULT_VISIBLE_COLUMNS);
+  };
+
+  const toggleDedupe = () => {
+    setIsDedupeEnabled((prev) => !prev);
   };
 
   const handleBulkStatusChange = (status: StatusValue) => {
@@ -852,6 +869,14 @@ export default function App() {
                     )
                   )}
                 </div>
+              <label className="toggle-inline">
+                <input
+                  type="checkbox"
+                  checked={isDedupeEnabled}
+                  onChange={toggleDedupe}
+                />
+                Скрывать дубликаты
+              </label>
               </div>
               <div className="filter-chips">
                 <p className="muted small">Статус</p>
@@ -902,7 +927,7 @@ export default function App() {
                     );
                   })}
                 </div>
-                <button
+                  <button
                   type="button"
                   className="action-button column-controls__reset"
                   onClick={resetColumns}
@@ -945,7 +970,7 @@ export default function App() {
                   >
                     Статус: In progress
                   </button>
-                </div>
+                    </div>
                 <div className="bulk-actions__secondary">
                   <label>
                     Команда
@@ -1045,7 +1070,7 @@ export default function App() {
                                   }}
                                 >
                                   {isExpanded ? "▼" : "▶"}
-                                </button>
+                  </button>
                               </td>
                               {visibleColumnConfig.map((column) => (
                                 <td key={column.id}>{column.render(entry)}</td>
@@ -1067,7 +1092,7 @@ export default function App() {
                     )}
                   </tbody>
                 </table>
-              </div>
+            </div>
 
               {selectedMetrics && (
                 <div className="selection-summary">
