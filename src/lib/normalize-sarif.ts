@@ -1,4 +1,3 @@
-import { createHash } from "crypto";
 import { z } from "zod";
 
 const MessageSchema = z
@@ -260,7 +259,8 @@ export function normalizeSarif(
           ...extractTags(rule?.properties?.tags),
         ])
       );
-      const partialFingerprints = result.partialFingerprints ?? {};
+      const partialFingerprints: Record<string, string> =
+        result.partialFingerprints ?? {};
       const dedupeKey = buildDedupeKey({
         result,
         message,
@@ -268,6 +268,9 @@ export function normalizeSarif(
         severity,
         partialFingerprints,
       });
+
+      const normalizedFingerprints: Record<string, string> =
+        result.fingerprints ?? {};
 
       findings.push({
         id:
@@ -283,17 +286,13 @@ export function normalizeSarif(
           rule?.fullDescription?.markdown,
         severity,
         message,
-        tool: {
-          name: driver?.name ?? "unknown",
-          version: driver?.semanticVersion ?? driver?.version,
-          informationUri: driver?.informationUri,
-        },
+        tool: buildToolInfo(driver),
         location,
         remediation,
         helpUrl: rule?.helpUri,
         tags,
         partialFingerprints,
-        fingerprints: result.fingerprints ?? {},
+        fingerprints: normalizedFingerprints,
         properties: result.properties ?? {},
         dedupeKey,
         rawResult: result,
@@ -306,7 +305,7 @@ export function normalizeSarif(
       sarifVersion: sarifLog.version,
       toolNames: Array.from(toolNames),
       uploadedAt: new Date().toISOString(),
-      fileName: options.fileName,
+      ...(options.fileName ? { fileName: options.fileName } : {}),
     },
     stats: {
       totalFindings: findings.length,
@@ -381,15 +380,31 @@ function pickLocation(result: SarifResult): NormalizedFindingLocation | undefine
   }
 
   const region = location.region;
-  return {
-    file: location.artifactLocation?.uri,
-    uriBaseId: location.artifactLocation?.uriBaseId,
-    startLine: region?.startLine,
-    startColumn: region?.startColumn,
-    endLine: region?.endLine,
-    endColumn: region?.endColumn,
-    snippet: region?.snippet?.text,
-  };
+  const normalized: NormalizedFindingLocation = {};
+
+  if (location.artifactLocation?.uri) {
+    normalized.file = location.artifactLocation.uri;
+  }
+  if (location.artifactLocation?.uriBaseId) {
+    normalized.uriBaseId = location.artifactLocation.uriBaseId;
+  }
+  if (typeof region?.startLine === "number") {
+    normalized.startLine = region.startLine;
+  }
+  if (typeof region?.startColumn === "number") {
+    normalized.startColumn = region.startColumn;
+  }
+  if (typeof region?.endLine === "number") {
+    normalized.endLine = region.endLine;
+  }
+  if (typeof region?.endColumn === "number") {
+    normalized.endColumn = region.endColumn;
+  }
+  if (region?.snippet?.text) {
+    normalized.snippet = region.snippet.text;
+  }
+
+  return Object.keys(normalized).length > 0 ? normalized : undefined;
 }
 
 function pickRemediation(
@@ -420,6 +435,25 @@ function extractTags(source: unknown): string[] {
   return [];
 }
 
+function buildToolInfo(
+  driver: SarifRun["tool"]["driver"] | undefined
+): NormalizedFinding["tool"] {
+  const tool: NormalizedFinding["tool"] = {
+    name: driver?.name ?? "unknown",
+  };
+
+  const version = driver?.semanticVersion ?? driver?.version;
+  if (version) {
+    tool.version = version;
+  }
+
+  if (driver?.informationUri) {
+    tool.informationUri = driver.informationUri;
+  }
+
+  return tool;
+}
+
 function buildDedupeKey(input: {
   result: SarifResult;
   message: string;
@@ -432,7 +466,7 @@ function buildDedupeKey(input: {
     input.partialFingerprints?.["primaryLocationFingerprint/v2"],
     input.result.fingerprints?.primaryLocationFingerprint,
     input.result.fingerprints?.["primaryLocationFingerprint/v2"],
-  ].filter(Boolean);
+  ].filter((value): value is string => Boolean(value));
 
   const fingerprintPayload = JSON.stringify(candidateFingerprints);
 
@@ -446,6 +480,25 @@ function buildDedupeKey(input: {
     fingerprintPayload,
   ];
 
-  return createHash("sha256").update(parts.join("::")).digest("hex");
+  return hashParts(parts.join("::"));
+}
+
+function hashParts(value: string) {
+  let h1 = 0xdeadbeef ^ value.length;
+  let h2 = 0x41c6ce57 ^ value.length;
+
+  for (let i = 0; i < value.length; i += 1) {
+    const ch = value.charCodeAt(i);
+    h1 = Math.imul(h1 ^ ch, 2654435761);
+    h2 = Math.imul(h2 ^ ch, 1597334677);
+  }
+
+  h1 = Math.imul(h1 ^ (h1 >>> 16), 2246822507) ^ Math.imul(h2 ^ (h2 >>> 13), 3266489909);
+  h2 = Math.imul(h2 ^ (h2 >>> 16), 2246822507) ^ Math.imul(h1 ^ (h1 >>> 13), 3266489909);
+
+  return (
+    (h2 >>> 0).toString(16).padStart(8, "0") +
+    (h1 >>> 0).toString(16).padStart(8, "0")
+  );
 }
 

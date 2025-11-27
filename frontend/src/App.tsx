@@ -99,7 +99,19 @@ const COLUMN_CONFIG: ColumnConfig[] = [
   {
     id: "type",
     label: "Тип уязвимости",
-    render: (row) => row.vulnerabilityType,
+    render: (row) => (
+      <span className="type-cell">
+        {row.dedupeCount > 1 && (
+          <span
+            className="dedupe-badge"
+            title={`Повторяется в ${row.dedupeCount} отчётах`}
+          >
+            dd
+          </span>
+        )}
+        {row.vulnerabilityType}
+      </span>
+    ),
   },
   {
     id: "vector",
@@ -199,6 +211,8 @@ interface AppSecRow extends FindingView {
   businessComponent: string;
   ownerTeam: string;
   occurrences: number;
+  dedupeKey: string;
+  dedupeCount: number;
   status: StatusValue;
   ageDays: number;
   source: string;
@@ -325,10 +339,15 @@ export default function App() {
 
   const resolvedRows = useMemo(() => {
     const occurrencesMap = new Map<string, number>();
+    const dedupeMap = new Map<string, number>();
     rawAppSecRows.forEach((row) => {
       occurrencesMap.set(
         row.vulnerabilityGroup,
         (occurrencesMap.get(row.vulnerabilityGroup) ?? 0) + 1
+      );
+      dedupeMap.set(
+        row.dedupeKey,
+        (dedupeMap.get(row.dedupeKey) ?? 0) + 1
       );
     });
 
@@ -337,6 +356,7 @@ export default function App() {
       return {
         ...row,
         occurrences: occurrencesMap.get(row.vulnerabilityGroup) ?? 1,
+        dedupeCount: dedupeMap.get(row.dedupeKey) ?? 1,
         ownerTeam: overrides?.ownerTeam ?? row.ownerTeam,
         status: overrides?.status ?? row.status,
       };
@@ -1221,6 +1241,8 @@ function buildAppSecRow(entry: FindingView): AppSecRow {
     businessComponent,
     ownerTeam,
     occurrences: 1,
+    dedupeKey: entry.finding.dedupeKey,
+    dedupeCount: 1,
     status,
     ageDays,
     source: entry.finding.tool.name,
