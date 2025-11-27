@@ -272,11 +272,10 @@ export default function App() {
   const [sessionId] = useState(() => getOrCreateSessionId());
   const [reports, setReports] = useState<SarifReport[]>([]);
   const [filters, setFilters] = useState<FiltersState>(initialFilters);
-  const [selectedFinding, setSelectedFinding] =
-    useState<FindingView | null>(null);
   const [selectedRowIds, setSelectedRowIds] = useState<string[]>([]);
   const [visibleColumns, setVisibleColumns] =
     useState<ColumnId[]>(DEFAULT_VISIBLE_COLUMNS);
+  const [expandedRowId, setExpandedRowId] = useState<string | null>(null);
   const [rowOverrides, setRowOverrides] = useState<Record<string, RowOverride>>(
     {}
   );
@@ -398,20 +397,6 @@ export default function App() {
   }, [resolvedRows, filters]);
 
   useEffect(() => {
-    if (filteredRows.length === 0) {
-      setSelectedFinding(null);
-      return;
-    }
-    setSelectedFinding((prev) => {
-      if (!prev) {
-        return filteredRows[0];
-      }
-      const stillExists = filteredRows.find((item) => item.uid === prev.uid);
-      return stillExists ?? filteredRows[0];
-    });
-  }, [filteredRows]);
-
-  useEffect(() => {
     if (!actionMessage) {
       return;
     }
@@ -469,7 +454,7 @@ export default function App() {
     [visibleColumns]
   );
 
-  const totalRenderedColumns = visibleColumnConfig.length + 1;
+  const totalRenderedColumns = visibleColumnConfig.length + 2;
 
   const selectedRowsData = useMemo(
     () =>
@@ -546,8 +531,8 @@ export default function App() {
     });
   };
 
-  const handleFindingSelect = (entry: FindingView) => {
-    setSelectedFinding(entry);
+  const handleRowToggle = (entry: FindingView) => {
+    setExpandedRowId((prev) => (prev === entry.uid ? null : entry.uid));
   };
 
   const toggleRowSelection = (uid: string) => {
@@ -716,15 +701,6 @@ export default function App() {
               </div>
             </div>
 
-            <aside className="details">
-              {selectedFinding ? (
-                <FindingDetails entry={selectedFinding} />
-              ) : (
-                <p className="muted">
-                  Выберите находку в таблице, чтобы увидеть подробности.
-                </p>
-              )}
-            </aside>
           </section>
 
           <section className="panel panel--summary">
@@ -1008,6 +984,7 @@ export default function App() {
                           disabled={filteredRows.length === 0}
                         />
                       </th>
+                      <th className="expand-header"></th>
                       {visibleColumnConfig.map((column) => (
                         <th key={column.id}>{column.label}</th>
                       ))}
@@ -1024,29 +1001,58 @@ export default function App() {
                         </td>
                       </tr>
                     ) : (
-                      filteredRows.map((entry) => (
-                        <tr
-                          key={entry.uid}
-                          className={
-                            selectedFinding?.uid === entry.uid ? "is-active" : ""
-                          }
-                          onClick={() => handleFindingSelect(entry)}
-                        >
-                          <td>
-                            <input
-                              type="checkbox"
-                              checked={selectedRowIds.includes(entry.uid)}
-                              onChange={(event) => {
-                                event.stopPropagation();
-                                toggleRowSelection(entry.uid);
-                              }}
-                            />
-                          </td>
-                          {visibleColumnConfig.map((column) => (
-                            <td key={column.id}>{column.render(entry)}</td>
-                          ))}
-                        </tr>
-                      ))
+                      filteredRows.map((entry) => {
+                        const isExpanded = expandedRowId === entry.uid;
+                        return (
+                          <>
+                            <tr
+                              key={entry.uid}
+                              className={
+                                isExpanded ? "is-active is-expanded" : ""
+                              }
+                              onClick={() => handleRowToggle(entry)}
+                            >
+                              <td onClick={(event) => event.stopPropagation()}>
+                                <input
+                                  type="checkbox"
+                                  checked={selectedRowIds.includes(entry.uid)}
+                                  onChange={(event) => {
+                                    event.stopPropagation();
+                                    toggleRowSelection(entry.uid);
+                                  }}
+                                />
+                              </td>
+                              <td onClick={(event) => event.stopPropagation()}>
+                                <button
+                                  className="expand-button"
+                                  aria-label={
+                                    isExpanded ? "Свернуть" : "Развернуть"
+                                  }
+                                  onClick={(event) => {
+                                    event.stopPropagation();
+                                    handleRowToggle(entry);
+                                  }}
+                                >
+                                  {isExpanded ? "▼" : "▶"}
+                                </button>
+                              </td>
+                              {visibleColumnConfig.map((column) => (
+                                <td key={column.id}>{column.render(entry)}</td>
+                              ))}
+                            </tr>
+                            {isExpanded && (
+                              <tr
+                                key={`${entry.uid}-details`}
+                                className="row-details"
+                              >
+                                <td colSpan={totalRenderedColumns}>
+                                  <FindingDetails entry={entry} />
+                                </td>
+                              </tr>
+                            )}
+                          </>
+                        );
+                      })
                     )}
                   </tbody>
                 </table>

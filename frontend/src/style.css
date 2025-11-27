@@ -192,23 +192,9 @@ h2 {
 }
 
 .panel--content {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) 360px;
+  display: flex;
+  flex-direction: column;
   gap: 1.5rem;
-}
-
-@media (min-width: 1400px) {
-  .panel--content {
-    grid-template-columns: minmax(0, 1fr) 420px;
-    gap: 2rem;
-  }
-}
-
-@media (min-width: 1920px) {
-  .panel--content {
-    grid-template-columns: minmax(0, 1fr) 480px;
-    gap: 2.5rem;
-  }
 }
 
 .filter-group {
@@ -449,6 +435,10 @@ input[type="number"] {
 
 .appsec-table th {
   word-break: break-word;
+}
+
+.expand-header {
+  width: 44px;
 }
 
 .appsec-table tr.is-active {
