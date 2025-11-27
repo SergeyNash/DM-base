@@ -715,6 +715,16 @@ export default function App() {
                 ))}
               </div>
             </div>
+
+            <aside className="details">
+              {selectedFinding ? (
+                <FindingDetails entry={selectedFinding} />
+              ) : (
+                <p className="muted">
+                  Выберите находку в таблице, чтобы увидеть подробности.
+                </p>
+              )}
+            </aside>
           </section>
 
           <section className="panel panel--summary">
@@ -1070,13 +1080,6 @@ export default function App() {
               )}
             </div>
 
-            <aside className="details">
-              {selectedFinding ? (
-                <FindingDetails entry={selectedFinding} />
-              ) : (
-                <p className="muted">Выберите находку слева, чтобы увидеть детали.</p>
-              )}
-            </aside>
           </section>
         </main>
       ) : isLoading ? (
