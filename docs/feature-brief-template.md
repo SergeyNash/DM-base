@@ -34,3 +34,4 @@
 
 > При генерации описания фичи вспомогательные записи: `docs/development-principles.md`, `docs/architecture-principles.md`, `docs/documentation-principles.md`, `docs/ux-principles.md`.
 
+

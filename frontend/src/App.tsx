@@ -14,22 +14,6 @@ type StatusValue = "new" | "confirmed" | "in_progress" | "resolved";
 type GroupingMode = "vulnType" | "ownerTeam" | "source";
 type AttackVector = "network" | "local" | "physical" | "unknown";
 type TrendState = "up" | "flat" | "down";
-type ColumnId =
-  | "priority"
-  | "cvss"
-  | "severity"
-  | "type"
-  | "vector"
-  | "businessComponent"
-  | "ownerTeam"
-  | "occurrences"
-  | "status"
-  | "age"
-  | "source"
-  | "trend"
-  | "slsa"
-  | "riskFactors"
-  | "group";
 
 interface FiltersState {
   severity: SeverityFilter;
@@ -62,23 +46,6 @@ const TEAM_OPTIONS = [
   "Cloud SecOps",
   "Data Platform",
   "AppSec Platform",
-];
-const DEFAULT_VISIBLE_COLUMNS: ColumnId[] = [
-  "priority",
-  "cvss",
-  "severity",
-  "type",
-  "vector",
-  "businessComponent",
-  "ownerTeam",
-  "occurrences",
-  "status",
-  "age",
-  "source",
-  "trend",
-  "slsa",
-  "riskFactors",
-  "group",
 ];
 
 interface FindingView {
@@ -156,10 +123,9 @@ export default function App() {
   const [sessionId] = useState(() => getOrCreateSessionId());
   const [reports, setReports] = useState<SarifReport[]>([]);
   const [filters, setFilters] = useState<FiltersState>(initialFilters);
+  const [selectedFinding, setSelectedFinding] =
+    useState<FindingView | null>(null);
   const [selectedRowIds, setSelectedRowIds] = useState<string[]>([]);
-  const [visibleColumns, setVisibleColumns] =
-    useState<ColumnId[]>(DEFAULT_VISIBLE_COLUMNS);
-  const [expandedRowIds, setExpandedRowIds] = useState<Set<string>>(new Set());
   const [rowOverrides, setRowOverrides] = useState<Record<string, RowOverride>>(
     {}
   );
@@ -281,6 +247,20 @@ export default function App() {
   }, [resolvedRows, filters]);
 
   useEffect(() => {
+    if (filteredRows.length === 0) {
+      setSelectedFinding(null);
+      return;
+    }
+    setSelectedFinding((prev) => {
+      if (!prev) {
+        return filteredRows[0];
+      }
+      const stillExists = filteredRows.find((item) => item.uid === prev.uid);
+      return stillExists ?? filteredRows[0];
+    });
+  }, [filteredRows]);
+
+  useEffect(() => {
     if (!actionMessage) {
       return;
     }
@@ -329,14 +309,6 @@ export default function App() {
     () => buildGroupingData(filteredRows, filters.groupBy),
     [filteredRows, filters.groupBy]
   );
-
-  const visibleColumnConfig = useMemo(() => {
-    return COLUMN_CONFIG.filter((column) =>
-      visibleColumns.includes(column.id)
-    );
-  }, [visibleColumns]);
-
-  const totalRenderedColumns = visibleColumnConfig.length + 2;
 
   const selectedRowsData = useMemo(
     () =>
@@ -414,19 +386,7 @@ export default function App() {
   };
 
   const handleFindingSelect = (entry: FindingView) => {
-    toggleRowExpansion(entry.uid);
-  };
-
-  const toggleRowExpansion = (uid: string) => {
-    setExpandedRowIds((prev) => {
-      const next = new Set(prev);
-      if (next.has(uid)) {
-        next.delete(uid);
-      } else {
-        next.add(uid);
-      }
-      return next;
-    });
+    setSelectedFinding(entry);
   };
 
   const toggleRowSelection = (uid: string) => {
@@ -748,7 +708,7 @@ export default function App() {
             </div>
           </section>
 
-          <section className="panel panel--table">
+          <section className="panel panel--content">
             <div className="table-stack">
               <div className="bulk-actions">
                 <div className="bulk-actions__primary">
@@ -826,7 +786,7 @@ export default function App() {
                 <table className="appsec-table">
                   <thead>
                     <tr>
-                      <th style={{ width: "30px" }}>
+                      <th>
                         <input
                           type="checkbox"
                           checked={allVisibleSelected}
@@ -834,7 +794,6 @@ export default function App() {
                           disabled={filteredRows.length === 0}
                         />
                       </th>
-                      <th style={{ width: "40px" }}></th>
                       <th>Приоритет</th>
                       <th>CVSS</th>
                       <th>Серьёзность</th>
@@ -855,47 +814,33 @@ export default function App() {
                   <tbody>
                     {filteredRows.length === 0 ? (
                       <tr>
-                        <td colSpan={17}>
+                        <td colSpan={16}>
                           <p className="table-empty">
-                            Нет находок под текущие фильтры. Ослабьте фильтры.
+                            Нет находок под текущие фильтры. Ослабьте фильтры
+                            или измените условие возраста.
                           </p>
                         </td>
                       </tr>
                     ) : (
-                      filteredRows.map((entry) => {
-                        const isExpanded = expandedRowIds.has(entry.uid);
-                        return (
-                          <>
-                            <tr
-                              key={entry.uid}
-                              className={
-                                isExpanded ? "is-active is-expanded" : ""
-                              }
-                              onClick={() => handleFindingSelect(entry)}
-                            >
-                              <td onClick={(e) => e.stopPropagation()}>
-                                <input
-                                  type="checkbox"
-                                  checked={selectedRowIds.includes(entry.uid)}
-                                  onChange={(event) => {
-                                    event.stopPropagation();
-                                    toggleRowSelection(entry.uid);
-                                  }}
-                                />
-                              </td>
-                              <td onClick={(e) => e.stopPropagation()}>
-                                <button
-                                  className="expand-button"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    toggleRowExpansion(entry.uid);
-                                  }}
-                                  aria-label={isExpanded ? "Свернуть" : "Развернуть"}
-                                >
-                                  {isExpanded ? "▼" : "▶"}
-                                </button>
-                              </td>
-                              <td>
+                      filteredRows.map((entry) => (
+                        <tr
+                          key={entry.uid}
+                          className={
+                            selectedFinding?.uid === entry.uid ? "is-active" : ""
+                          }
+                          onClick={() => handleFindingSelect(entry)}
+                        >
+                          <td>
+                            <input
+                              type="checkbox"
+                              checked={selectedRowIds.includes(entry.uid)}
+                              onChange={(event) => {
+                                event.stopPropagation();
+                                toggleRowSelection(entry.uid);
+                              }}
+                            />
+                          </td>
+                          <td>
                             <span
                               className={`priority-pill priority-pill--${entry.priority}`}
                             >
@@ -952,17 +897,8 @@ export default function App() {
                             </div>
                           </td>
                           <td>{entry.vulnerabilityGroup}</td>
-                            </tr>
-                            {isExpanded && (
-                              <tr key={`${entry.uid}-details`} className="row-details">
-                                <td colSpan={17}>
-                                  <FindingDetails entry={entry} />
-                                </td>
-                              </tr>
-                            )}
-                          </>
-                        );
-                      })
+                        </tr>
+                      ))
                     )}
                   </tbody>
                 </table>
@@ -995,6 +931,14 @@ export default function App() {
                 </div>
               )}
             </div>
+
+            <aside className="details">
+              {selectedFinding ? (
+                <FindingDetails entry={selectedFinding} />
+              ) : (
+                <p className="muted">Выберите находку слева, чтобы увидеть детали.</p>
+              )}
+            </aside>
           </section>
         </main>
       ) : isLoading ? (
