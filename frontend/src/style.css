@@ -330,6 +330,44 @@ input[type="number"] {
   gap: 0.9rem;
 }
 
+.column-controls {
+  border: 1px solid #e2e8f0;
+  border-radius: 16px;
+  padding: 0.9rem 1rem;
+  background: #f8fafc;
+  font-size: 0.9rem;
+}
+
+.column-controls summary {
+  cursor: pointer;
+  font-weight: 600;
+  color: #0f172a;
+  outline: none;
+}
+
+.column-controls[open] {
+  box-shadow: inset 0 0 0 1px rgba(15, 23, 42, 0.05);
+}
+
+.column-controls__list {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 0.5rem;
+  margin: 0.75rem 0;
+}
+
+.column-toggle {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.85rem;
+  color: #475569;
+}
+
+.column-controls__reset {
+  margin-top: 0.25rem;
+}
+
 .bulk-actions {
   display: flex;
   flex-wrap: wrap;

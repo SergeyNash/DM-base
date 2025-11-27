@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import type { ReactNode } from "react";
 
 import { fetchReports, uploadSarifFile } from "./api";
 import { getOrCreateSessionId } from "./session";
@@ -14,6 +15,22 @@ type StatusValue = "new" | "confirmed" | "in_progress" | "resolved";
 type GroupingMode = "vulnType" | "ownerTeam" | "source";
 type AttackVector = "network" | "local" | "physical" | "unknown";
 type TrendState = "up" | "flat" | "down";
+type ColumnId =
+  | "priority"
+  | "cvss"
+  | "severity"
+  | "type"
+  | "vector"
+  | "businessComponent"
+  | "ownerTeam"
+  | "occurrences"
+  | "status"
+  | "age"
+  | "source"
+  | "trend"
+  | "slsa"
+  | "riskFactors"
+  | "group";
 
 interface FiltersState {
   severity: SeverityFilter;
@@ -47,6 +64,132 @@ const TEAM_OPTIONS = [
   "Data Platform",
   "AppSec Platform",
 ];
+const DEFAULT_VISIBLE_COLUMNS: ColumnId[] = [
+  "priority",
+  "cvss",
+  "severity",
+  "type",
+  "vector",
+  "businessComponent",
+  "ownerTeam",
+  "occurrences",
+  "status",
+  "age",
+  "source",
+  "trend",
+  "slsa",
+  "riskFactors",
+  "group",
+];
+const COLUMN_CONFIG: ColumnConfig[] = [
+  {
+    id: "priority",
+    label: "Приоритет",
+    render: (row) => (
+      <span className={`priority-pill priority-pill--${row.priority}`}>
+        {PRIORITY_LABELS[row.priority]} · {row.priorityScore.toFixed(1)}
+      </span>
+    ),
+  },
+  {
+    id: "cvss",
+    label: "CVSS",
+    render: (row) => row.cvssScore.toFixed(1),
+  },
+  {
+    id: "severity",
+    label: "Серьёзность",
+    render: (row) => (
+      <span className={`pill pill--${row.finding.severity}`}>
+        {row.finding.severity}
+      </span>
+    ),
+  },
+  {
+    id: "type",
+    label: "Тип уязвимости",
+    render: (row) => row.vulnerabilityType,
+  },
+  {
+    id: "vector",
+    label: "Вектор атаки",
+    render: (row) => (
+      <span className={`attack attack--${row.attackVector}`}>
+        {ATTACK_VECTOR_LABELS[row.attackVector]}
+      </span>
+    ),
+  },
+  {
+    id: "businessComponent",
+    label: "Бизнес-компонент",
+    render: (row) => row.businessComponent,
+  },
+  {
+    id: "ownerTeam",
+    label: "Проект / команда",
+    render: (row) => row.ownerTeam,
+  },
+  {
+    id: "occurrences",
+    label: "Кол-во вхождений",
+    render: (row) => row.occurrences,
+  },
+  {
+    id: "status",
+    label: "Статус",
+    render: (row) => (
+      <span className={`status-pill status-pill--${row.status}`}>
+        {STATUS_LABELS[row.status]}
+      </span>
+    ),
+  },
+  {
+    id: "age",
+    label: "Возраст",
+    render: (row) => `${row.ageDays} дн.`,
+  },
+  {
+    id: "source",
+    label: "Источник",
+    render: (row) => row.source,
+  },
+  {
+    id: "trend",
+    label: "Тренд",
+    render: (row) => (
+      <span className={`trend trend--${row.trend}`}>
+        {TREND_ICONS[row.trend]} {TREND_LABELS[row.trend]}
+      </span>
+    ),
+  },
+  {
+    id: "slsa",
+    label: "SLSA",
+    render: (row) => row.slsaLevel,
+  },
+  {
+    id: "riskFactors",
+    label: "Риск-факторы",
+    render: (row) => (
+      <div className="pill-group">
+        {row.riskFactors.length === 0 ? (
+          <span className="muted small">—</span>
+        ) : (
+          row.riskFactors.map((factor) => (
+            <span key={factor} className="risk-badge">
+              {factor}
+            </span>
+          ))
+        )}
+      </div>
+    ),
+  },
+  {
+    id: "group",
+    label: "Группа",
+    render: (row) => row.vulnerabilityGroup,
+  },
+];
 
 interface FindingView {
   uid: string;
@@ -77,6 +220,12 @@ interface AppSecRow extends FindingView {
 interface RowOverride {
   status?: StatusValue;
   ownerTeam?: string;
+}
+
+interface ColumnConfig {
+  id: ColumnId;
+  label: string;
+  render: (row: AppSecRow) => ReactNode;
 }
 
 const PRIORITY_LABELS: Record<PriorityLevel, string> = {
@@ -126,6 +275,8 @@ export default function App() {
   const [selectedFinding, setSelectedFinding] =
     useState<FindingView | null>(null);
   const [selectedRowIds, setSelectedRowIds] = useState<string[]>([]);
+  const [visibleColumns, setVisibleColumns] =
+    useState<ColumnId[]>(DEFAULT_VISIBLE_COLUMNS);
   const [rowOverrides, setRowOverrides] = useState<Record<string, RowOverride>>(
     {}
   );
@@ -310,6 +461,16 @@ export default function App() {
     [filteredRows, filters.groupBy]
   );
 
+  const visibleColumnConfig = useMemo(
+    () =>
+      COLUMN_CONFIG.filter((column) =>
+        visibleColumns.includes(column.id)
+      ),
+    [visibleColumns]
+  );
+
+  const totalRenderedColumns = visibleColumnConfig.length + 1;
+
   const selectedRowsData = useMemo(
     () =>
       resolvedRows.filter((row) => selectedRowIds.includes(row.uid)),
@@ -410,6 +571,22 @@ export default function App() {
 
   const clearSelection = () => {
     setSelectedRowIds([]);
+  };
+
+  const toggleColumnVisibility = (columnId: ColumnId) => {
+    setVisibleColumns((prev) => {
+      if (prev.includes(columnId)) {
+        if (prev.length === 1) {
+          return prev;
+        }
+        return prev.filter((item) => item !== columnId);
+      }
+      return [...prev, columnId];
+    });
+  };
+
+  const resetColumns = () => {
+    setVisibleColumns(DEFAULT_VISIBLE_COLUMNS);
   };
 
   const handleBulkStatusChange = (status: StatusValue) => {
@@ -710,6 +887,33 @@ export default function App() {
 
           <section className="panel panel--content">
             <div className="table-stack">
+              <details className="column-controls">
+                <summary>Настроить столбцы</summary>
+                <div className="column-controls__list">
+                  {COLUMN_CONFIG.map((column) => {
+                    const isChecked = visibleColumns.includes(column.id);
+                    return (
+                      <label key={column.id} className="column-toggle">
+                        <input
+                          type="checkbox"
+                          checked={isChecked}
+                          onChange={() => toggleColumnVisibility(column.id)}
+                          disabled={isChecked && visibleColumns.length === 1}
+                        />
+                        {column.label}
+                      </label>
+                    );
+                  })}
+                </div>
+                <button
+                  type="button"
+                  className="action-button column-controls__reset"
+                  onClick={resetColumns}
+                  disabled={visibleColumns.length === COLUMN_CONFIG.length}
+                >
+                  Сбросить столбцы
+                </button>
+              </details>
               <div className="bulk-actions">
                 <div className="bulk-actions__primary">
                   <button
@@ -794,27 +998,15 @@ export default function App() {
                           disabled={filteredRows.length === 0}
                         />
                       </th>
-                      <th>Приоритет</th>
-                      <th>CVSS</th>
-                      <th>Серьёзность</th>
-                      <th>Тип уязвимости</th>
-                      <th>Вектор атаки</th>
-                      <th>Бизнес-компонент</th>
-                      <th>Проект / команда</th>
-                      <th>Кол-во вхождений</th>
-                      <th>Статус</th>
-                      <th>Возраст</th>
-                      <th>Источник</th>
-                      <th>Тренд</th>
-                      <th>SLSA</th>
-                      <th>Риск-факторы</th>
-                      <th>Группа</th>
+                      {visibleColumnConfig.map((column) => (
+                        <th key={column.id}>{column.label}</th>
+                      ))}
                     </tr>
                   </thead>
                   <tbody>
                     {filteredRows.length === 0 ? (
                       <tr>
-                        <td colSpan={16}>
+                        <td colSpan={totalRenderedColumns}>
                           <p className="table-empty">
                             Нет находок под текущие фильтры. Ослабьте фильтры
                             или измените условие возраста.
@@ -840,63 +1032,9 @@ export default function App() {
                               }}
                             />
                           </td>
-                          <td>
-                            <span
-                              className={`priority-pill priority-pill--${entry.priority}`}
-                            >
-                              {PRIORITY_LABELS[entry.priority]} ·{" "}
-                              {entry.priorityScore.toFixed(1)}
-                            </span>
-                          </td>
-                          <td>{entry.cvssScore.toFixed(1)}</td>
-                          <td>
-                            <span
-                              className={`pill pill--${entry.finding.severity}`}
-                            >
-                              {entry.finding.severity}
-                            </span>
-                          </td>
-                          <td>{entry.vulnerabilityType}</td>
-                          <td>
-                            <span
-                              className={`attack attack--${entry.attackVector}`}
-                            >
-                              {ATTACK_VECTOR_LABELS[entry.attackVector]}
-                            </span>
-                          </td>
-                          <td>{entry.businessComponent}</td>
-                          <td>{entry.ownerTeam}</td>
-                          <td>{entry.occurrences}</td>
-                          <td>
-                            <span
-                              className={`status-pill status-pill--${entry.status}`}
-                            >
-                              {STATUS_LABELS[entry.status]}
-                            </span>
-                          </td>
-                          <td>{entry.ageDays} дн.</td>
-                          <td>{entry.source}</td>
-                          <td>
-                            <span className={`trend trend--${entry.trend}`}>
-                              {TREND_ICONS[entry.trend]}{" "}
-                              {TREND_LABELS[entry.trend]}
-                            </span>
-                          </td>
-                          <td>{entry.slsaLevel}</td>
-                          <td>
-                            <div className="pill-group">
-                              {entry.riskFactors.length === 0 ? (
-                                <span className="muted small">—</span>
-                              ) : (
-                                entry.riskFactors.map((factor) => (
-                                  <span key={factor} className="risk-badge">
-                                    {factor}
-                                  </span>
-                                ))
-                              )}
-                            </div>
-                          </td>
-                          <td>{entry.vulnerabilityGroup}</td>
+                          {visibleColumnConfig.map((column) => (
+                            <td key={column.id}>{column.render(entry)}</td>
+                          ))}
                         </tr>
                       ))
                     )}
